@@ -58,11 +58,11 @@ class PER_ReplayBuffer:
     def __init__(self, device, buffer_size, batch_size, alpha, beta):
      # alpha is the power of the probability to address over selection problem
      # beta is the power used when update the weights.
-     self.buffer = SumTree(buffer_size)
-     self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
-     self.alpha = alpha
-     self.beta = beta
-     self.device = device
+        self.buffer = SumTree(buffer_size)
+        self.experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done"])
+        self.alpha = alpha
+        self.beta = beta
+        self.device = device
 
     def get_priorities(self):
         # all the list of priorities for all data/experience in the buffer
