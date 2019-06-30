@@ -45,7 +45,7 @@ class Agent():
         self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=LR)
 
         # Replay memory
-       
+        # def __init__(self, device, buffer_size, batch_size, alpha, beta):
         if self.buffer_type =='PER_ReplayBuffer':
             self.memory = PER_ReplayBuffer(device, BUFFER_SIZE, BATCH_SIZE, ALPHA, BETA)
         if self.buffer_type == 'ReplayBuffer':
@@ -63,6 +63,7 @@ class Agent():
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
                 experiences = self.memory.sample()
+                print('debugging:', experiences )
                 self.learn(experiences, GAMMA)
 
     def act(self, state, eps=0.):
