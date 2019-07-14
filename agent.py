@@ -2,7 +2,7 @@ import numpy as np
 import random
 from collections import namedtuple, deque
 
-from model import QNetwork
+from model import QNetwork,WeightedLoss
 from buffers import ReplayBuffer, PER_ReplayBuffer
 
 import torch
@@ -17,7 +17,7 @@ TAU = 1e-3              # for soft update of target parameters
 LR = 5e-4               # learning rate 
 UPDATE_EVERY = 4        # how often to update the network
 ALPHA = 0.5
-BETA = 0.4
+BETA = 0.5
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -52,6 +52,8 @@ class Agent():
             self.memory = ReplayBuffer(device, action_size, BUFFER_SIZE, BATCH_SIZE, seed)
         # Initialize time step (for updating every UPDATE_EVERY steps)
         self.t_step = 0
+        
+        
     
     def step(self, state, action, reward, next_state, done):
         # Save experience in replay memory
@@ -62,9 +64,15 @@ class Agent():
         if self.t_step == 0:
             # If enough samples are available in memory, get random subset and learn
             if len(self.memory) > BATCH_SIZE:
-                experiences = self.memory.sample()
-                print('debugging:', experiences )
-                self.learn(experiences, GAMMA)
+                if self.buffer_type == 'ReplayBuffer':
+                    experiences = self.memory.sample()
+                    is_weights = None
+                    idxs = None
+                if self.buffer_type =='PER_ReplayBuffer':
+                    experiences, is_weights, idxs = self.memory.sample()
+                    self.criterion = WeightedLoss()
+                    #print('debugging:', experiences )
+                self.learn(experiences, is_weights, idxs, GAMMA)
 
     def act(self, state, eps=0.):
         """Returns actions for given state as per current policy.
@@ -86,7 +94,7 @@ class Agent():
         else:
             return random.choice(np.arange(self.action_size))
 
-    def learn(self, experiences, gamma):
+    def learn(self, experiences, is_weights, idxs, gamma):
         """Update value parameters using given batch of experience tuples.
 
         Params
@@ -113,10 +121,18 @@ class Agent():
 
         # Get expected Q values from local model
         Q_expected = self.qnetwork_local(states).gather(1, actions)
+      
+    #------------------------------------------------------------------------------  
+        #Huber Loss provides better results than MSE
+        if is_weights is None:
+            loss = F.smooth_l1_loss(Q_expected, Q_targets)
 
-        # Compute loss
-        loss = F.mse_loss(Q_expected, Q_targets)
-        # Minimize the loss
+        #Compute Huber Loss manually to utilize is_weights with Prioritization
+        else:
+            loss, td_errors = self.criterion.huber(Q_expected, Q_targets, is_weights)
+            self.memory.batch_update(idxs, td_errors)
+
+        # Perform gradient descent
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()

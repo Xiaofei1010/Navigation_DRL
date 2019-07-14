@@ -26,3 +26,18 @@ class QNetwork(nn.Module):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
+
+
+class WeightedLoss(nn.Module):
+    """
+    Returns Huber Loss with importance sampled weighting.
+    """
+
+    def __init__(self):
+        super(WeightedLoss, self).__init__()
+
+    def huber(self, values, targets, weights):
+        errors = torch.abs(values - targets)
+        loss = (errors<1).float()*(errors**2) + (errors>=1).float()*(errors - 0.5)
+        weighted_loss = (weights * loss).sum()
+        return weighted_loss, errors.detach().cpu().numpy()
