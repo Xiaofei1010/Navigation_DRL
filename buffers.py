@@ -39,7 +39,7 @@ class ReplayBuffer:
     def sample(self):
         """Randomly sample a batch of experiences from memory."""
         experiences = random.sample(self.memory, k=self.batch_size)
-        #print('experiences in function sample before sending to torch in ReplayBuffer is ', experiences[0])
+        
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(self.device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(self.device)
@@ -77,6 +77,8 @@ class PER_ReplayBuffer:
         """
         max_priority = np.max(self.get_priorities())
         e = self.experience(state, action, reward, next_state, done) 
+        if type(e) is int:
+            print('In add function, e is int')
         if max_priority == 0: # when there is no data in the Sumtree, all priorities are 0. 
             max_priority = 1
         self.buffer.add(max_priority, e)
@@ -101,13 +103,22 @@ class PER_ReplayBuffer:
             index, priority, data = self.buffer.get(value) #retrieve corresponding experience
             idxs.append(index)
             priorities.append(priority)
-            experiences.append(data)
+            if type(data) is int:
+                print('debugging...')
+                print('self.buffer.total_priority is ', self.buffer.total_priority)
+                print(self.buffer.data[0])
+                print(len(self.buffer.data))
+                print(index, data, value)
+                
+                print(self.buffer.data[index])
+            else:
+                experiences.append(data)
             # p = priority / self.buffer.total_priority
             # is_weights[i, 0] = np.power(n * p, -self.beta) / max_weight
             # indexes[i]= index
         
         #setup weights
-        #priorities += 0.000001
+        #priorities = [p + 0.000001 for p in priorities]
         #probabilities = priorities / (self.buffer.total_priority  + 0.000001 * len(priorities))
         
         probabilities = priorities / self.buffer.total_priority
@@ -119,9 +130,9 @@ class PER_ReplayBuffer:
         #Dividing by the max of the batch is a bit different than the original
         #paper, but should accomplish the same goal of always scaling downwards
         #but should be slightly faster than calculating on the entire tree
-        if sum(np.array(probabilities) == 0) != 0:
-            print(experiences, probabilities)
-        probabilities = [p + 0.00001 for p in probabilities]
+        #if sum(np.array(probabilities) == 0) != 0:
+             #print(experiences, probabilities)
+        #probabilities = [p + 0.00001 for p in probabilities]
         is_weights = np.power(self.buffer.num_entries * probabilities, -self.beta)
         #print('max_weights is ', is_weights.max())
         is_weights /= is_weights.max()
@@ -131,17 +142,17 @@ class PER_ReplayBuffer:
         #print('In PER_ReplayBuffer, the batch in the sample function is ', batch)
         #states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
         #return self.experience(*zip(*batch)), is_weights, idxs
+        for e in experiences:
+            if type(e) is int:
+                print(" ")
+                print('experiences in function sample before sending to torch in ReplayBuffer is ', e)
         states = torch.from_numpy(np.vstack([e.state for e in experiences if e is not None])).float().to(self.device)
         actions = torch.from_numpy(np.vstack([e.action for e in experiences if e is not None])).long().to(self.device)
         rewards = torch.from_numpy(np.vstack([e.reward for e in experiences if e is not None])).float().to(self.device)
         next_states = torch.from_numpy(np.vstack([e.next_state for e in experiences if e is not None])).float().to(self.device)
         dones = torch.from_numpy(np.vstack([e.done for e in experiences if e is not
 None]).astype(np.uint8)).float().to(self.device)
-        return (states, actions, rewards, next_states, dones), is_weights, idxs
-                                            
-                                            
-                                           
-                                            
+        return (states, actions, rewards, next_states, dones), is_weights, idxs                                                                                                                                                                    
     def batch_update(self, tree_idx, td_errors):
         """
         Update the priorities on the tree
